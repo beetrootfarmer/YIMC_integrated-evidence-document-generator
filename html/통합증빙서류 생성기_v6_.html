@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>통합 증빙 서류 생성기</title>
+  
+  <!-- 스타일 도구 (Tailwind CSS) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 리액트(React) 구동기 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- 도구 불러오기 (PDF, 엑셀) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/cpexcel.js"></script>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
+
+  <style>
+    body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    
+    /* 부드러운 스크롤 적용 */
+    html { scroll-behavior: smooth; }
+    #preview-area { scroll-behavior: smooth; }
+
+    @media print {
+      body { background-color: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      #sidebar { display: none !important; }
+      #preview-area { display: block !important; padding: 0 !important; margin: 0 !important; background: white !important; overflow: visible !important; }
+      #pdf-content-wrapper { display: block !important; gap: 0 !important; }
+      .pdf-page { box-shadow: none !important; margin: 0 !important; page-break-after: always !important; break-after: page !important; }
+      input, textarea { border: none !important; background: transparent !important; resize: none; outline: none; color: black !important; -webkit-text-fill-color: black !important; }
+      .text-blue-700 { color: black !important; }
+    }
+
+    .pdf-input { border: 1px dashed transparent; transition: border-color 0.2s; background-color: transparent; font-family: inherit; }
+    .pdf-input:hover, .pdf-input:focus { border-color: #94a3b8; outline: none; }
+    .hide-border-on-export .pdf-input, .hide-border-on-export .text-blue-700 { border-color: transparent !important; color: black !important; }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    // 아이콘 컴포넌트 모음
+    const Icons = {
+      Download: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Image: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>,
+      Upload: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+      X: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+      Trash: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+      Printer: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
+      Excel: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h4"/></svg>,
+      Grip: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>,
+      Link: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+      Save: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+      FolderOpen: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    };
+
+    // 문서 설정 통합 관리 (분류 탭 정보 포함)
+    const DOC_CONFIGS = {
+      consent: { name: '계좌이체 승낙서', tab: 'before', needsBasicInfo: true },
+      signature: { name: '서명부', tab: 'before', needsBasicInfo: true, needsExcel: true },
+      consentScan: { name: '계좌이체 승낙서 스캔본', tab: 'after', max: 1 },
+      resume: { name: '강사이력서', tab: 'after', max: 1 },
+      idCard: { name: '신분증', tab: 'after', max: 1 },
+      bankbook: { name: '통장사본', tab: 'after', max: 1 },
+      signatureScan: { name: '서명부 스캔본', tab: 'after', max: 10 },
+      snack: { name: '다과 증빙', tab: 'after', max: 2, needsBasicInfo: true },
+      lecture: { name: '강의 사진 증빙', tab: 'after', max: 4, needsBasicInfo: true },
+      material: { name: '강의 자료 증빙', tab: 'after', max: 4, needsBasicInfo: true }
+    };
+
+    // 개별 업로드 섹션 컴포넌트
+const UploadSection = ({ type, config, images, handleFileUpload, handleClearSectionImages, fileInputRef, removeImage, uploadFormat }) => {    const [isDragOver, setIsDragOver] = useState(false);
+    const isPdfSupported = ['lecture','material', 'resume', 'idCard', 'bankbook', 'consentScan', 'signatureScan'].includes(type);
+      
+    const isPdfMode = uploadFormat === 'pdf';
+    const maxCount = (isPdfMode && type === 'lecture') ? 10 : config.max;
+
+    const handleDrop = (e) => { e.preventDefault(); setIsDragOver(false); handleFileUpload(type, maxCount, Array.from(e.dataTransfer.files)); };
+      return (
+    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm transition-all hover:border-blue-300">
+      <div className="flex justify-between items-center mb-2">
+        <label className="text-sm font-bold text-gray-700">
+          {config.name} {isPdfSupported && <span className="text-blue-500 text-xs ml-1">(PDF 지원)</span>}
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">({images[type].length}/{maxCount}장)</span>
+          {images[type].length > 0 && (
+            <button onClick={() => handleClearSectionImages(type)} className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 bg-red-50 hover:bg-red-100 rounded">삭제</button>
+          )}
+        </div>
+      </div>
+      
+      {images[type].length < maxCount && (
+        <div 
+          className={`w-full border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer transition-colors mb-2 ${isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:bg-gray-50'}`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input type="file" accept={isPdfSupported ? "image/*, application/pdf" : "image/*"} multiple={maxCount > 1} className="hidden" ref={fileInputRef} onChange={(e) => handleFileUpload(type, maxCount, Array.from(e.target.files))} />
+          <Icons.Upload className={`w-5 h-5 mb-1 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+          <span className="text-xs text-gray-500 text-center">클릭하거나 파일을 끌어다 놓으세요</span>
+        </div>
+      )}
+
+      {images[type].length > 0 && (
+        <div className={`grid gap-2 mt-2 ${maxCount > 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {images[type].map((src, idx) => (
+            <div key={idx} className="relative bg-gray-200 rounded overflow-hidden" style={{ aspectRatio: ['resume', 'idCard', 'bankbook', 'consentScan', 'signatureScan'].includes(type) || isPdfMode ? '1/1.4' : '16/9' }}>
+              <img src={src} alt="미리보기" className="w-full h-full object-cover" />
+              <button onClick={() => removeImage(type, idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"><Icons.X className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+    };
+
+    // ---------------------------------------------------------
+    // 출력용 문서 렌더링 컴포넌트들
+    // ---------------------------------------------------------
+    const ConsentPage = ({ id, courseName, date, time, consentData, handleChange }) => (
+      <div id={id} className="bg-white text-black shadow-2xl relative pdf-page font-serif flex flex-col justify-between" style={{ width: '210mm', height: '297mm', padding: '15mm 20mm', boxSizing: 'border-box' }}>
+        <div>
+          <h1 className="text-[24px] font-bold text-center mb-6">용인시 미디어센터 강의료 예금계좌 이체승낙서</h1>
+          <p className="mb-4 leading-relaxed text-[15px]">용인시 미디어센터의 &lt;<span className="font-bold text-blue-700">{courseName}</span>&gt;에 따른 강의비를 아래 계좌로 이체하여 수령함을 승낙합니다.</p>
+          <div className="mb-5 space-y-2 text-[15px] font-bold">
+            <p>1. 강 의 일 시: <span className="text-blue-700">{date} ( {time} )</span></p>
+            <p className="flex items-center gap-1">2. 총강의시간 : <input type="text" className="pdf-input w-12 text-center text-blue-700" value={consentData.totalHours} onChange={(e) => handleChange('totalHours', e.target.value)} />시간</p>
+            <p>3. 내 용</p>
+          </div>
+          <table className="w-full border-collapse border border-black text-[15px] mb-6 text-center">
+            <tbody>
+              <tr className="h-[10mm]"><td className="border border-black bg-gray-100 p-2 w-1/4 font-bold">은행명</td><td className="border border-black p-2 w-3/4 text-left"><input type="text" className="pdf-input w-full text-blue-700 font-bold" value={consentData.bankName} onChange={(e) => handleChange('bankName', e.target.value)} /></td></tr>
+              <tr className="h-[10mm]"><td className="border border-black bg-gray-100 p-2 font-bold">계좌번호</td><td className="border border-black p-2 text-left"><input type="text" className="pdf-input w-full text-blue-700 font-bold" value={consentData.accountNum} onChange={(e) => handleChange('accountNum', e.target.value)} /></td></tr>
+              <tr className="h-[10mm]"><td className="border border-black bg-gray-100 p-2 font-bold">예금주명<br/><span className="text-sm">(본인명의)</span></td><td className="border border-black p-2 text-left"><input type="text" className="pdf-input w-full text-blue-700 font-bold" value={consentData.accountOwner} onChange={(e) => handleChange('accountOwner', e.target.value)} /></td></tr>
+              <tr className="h-[10mm]"><td className="border border-black bg-gray-100 p-2 font-bold">금액</td>
+                <td className="border border-black p-2 text-left flex items-center flex-wrap h-full">
+                  <span className="mr-2">일금</span><input type="text" className="pdf-input w-28 text-right font-bold text-blue-700" value={consentData.totalAmount} onChange={(e) => handleChange('totalAmount', e.target.value)} /><span className="ml-1">원</span>
+                  <span className="text-sm text-gray-700 ml-4">(기타소득세를 제외한 실수령액 : <input type="text" className="pdf-input w-24 text-right text-blue-700 font-bold mx-1" value={consentData.netAmount} onChange={(e) => handleChange('netAmount', e.target.value)} readOnly />원)</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="text-center mb-6 flex justify-center items-center gap-2 text-lg font-bold">
+            <input type="text" className="pdf-input w-16 text-center text-blue-700" value={consentData.signYear} onChange={(e) => handleChange('signYear', e.target.value)} />년 
+            <input type="text" className="pdf-input w-10 text-center text-blue-700" value={consentData.signMonth} onChange={(e) => handleChange('signMonth', e.target.value)} />월 
+            <input type="text" className="pdf-input w-10 text-center text-blue-700" value={consentData.signDay} onChange={(e) => handleChange('signDay', e.target.value)} />일
+          </div>
+          <div className="space-y-3 text-[15px]">
+            <p className="flex items-center">◦ 주민등록번호 : <input type="text" className="pdf-input w-64 ml-2 text-blue-700" value={consentData.ssn} onChange={(e) => handleChange('ssn', e.target.value)} /></p>
+            <p className="flex items-center">◦ 주소(자택) : <input type="text" className="pdf-input flex-1 ml-2 text-blue-700" value={consentData.address} onChange={(e) => handleChange('address', e.target.value)} /></p>
+            <p className="flex items-center">◦ 연락처 : <input type="text" className="pdf-input w-64 ml-2 text-blue-700" value={consentData.contact} onChange={(e) => handleChange('contact', e.target.value)} /></p>
+            <p className="flex items-center">◦ 소속기관 및 부서 : <input type="text" className="pdf-input w-64 ml-2 text-blue-700" value={consentData.affiliation} onChange={(e) => handleChange('affiliation', e.target.value)} /></p>
+            <div className="flex justify-end items-center mt-4 font-bold text-lg">
+              ◦ 성명 : <input type="text" className="pdf-input w-32 text-center mx-2 text-blue-700" value={consentData.name} onChange={(e) => handleChange('name', e.target.value)} /> (서명 또는 인)
+            </div>
+          </div>
+        </div>
+        <div className="border-t-2 border-black pt-5 mt-4">
+          <h2 className="text-lg font-bold text-center mb-3">개인정보의 수집·이용·제공 및 활용 동의서(신청인)</h2>
+          <div className="text-sm space-y-1 mb-5 text-gray-800">
+            <p>1. 수집항목 : 성명, 연락처, 주민등록번호, 계좌번호, 주소 등</p>
+            <p>2. 이용목적 : 예금계좌이체 및 원천징수</p>
+            <p>3. 보유기간 : 사업종료 후 5년 이하</p>
+            <p>4. 본 센터는 수집된 개인정보에 대해 안내된 이용목적 이외의 용도로 활용하지 않으며, 보유기간 이후 자동삭제됨을 알려 드립니다.</p>
+          </div>
+          <p className="text-center font-bold mb-4 text-[15px]">본인은 용인시 미디어센터에서 위와 같이 개인정보를 수집, 이용함에 동의합니다.</p>
+          <div className="text-center mb-4 flex justify-center items-center gap-2 font-bold">
+            <input type="text" className="pdf-input w-16 text-center text-blue-700" value={consentData.signYear} onChange={(e) => handleChange('signYear', e.target.value)} />년 
+            <input type="text" className="pdf-input w-10 text-center text-blue-700" value={consentData.signMonth} onChange={(e) => handleChange('signMonth', e.target.value)} />월 
+            <input type="text" className="pdf-input w-10 text-center text-blue-700" value={consentData.signDay} onChange={(e) => handleChange('signDay', e.target.value)} />일
+          </div>
+          <div className="flex justify-end items-center font-bold text-lg pb-2">
+            성명 : <input type="text" className="pdf-input w-32 text-center mx-2 text-blue-700" value={consentData.name} onChange={(e) => handleChange('name', e.target.value)} /> (서명 또는 인)
+          </div>
+        </div>
+      </div>
+    );
+
+    const SingleImagePage = ({ id, type, title, images,isFullPageOverride }) => {
+      const currentImages = images[type];
+      
+      // ✅ 3. 승낙서와 서명부 스캔본은 여백/제목 없이 전체 화면(Full-page) 렌더링, isFullPageOverride 옵션으로 우선 판단.
+      const isFullPage = isFullPageOverride || ['consentScan', 'signatureScan'].includes(type);
+
+      if (currentImages.length === 0) {
+        return (
+          <div id={id} className="bg-white text-black shadow-2xl relative pdf-page flex flex-col" style={{ width: '210mm', height: '297mm', padding: '20mm', boxSizing: 'border-box' }}>
+            <h1 className="text-2xl font-bold text-center mb-6">{title}</h1>
+            <div className="flex-1 w-full border border-gray-300 flex items-center justify-center bg-gray-50"><p className="text-gray-400">이미지가 첨부되지 않았습니다.</p></div>
+          </div>
+        );
+      }
+      
+      return currentImages.map((imgSrc, idx) => (
+        <div 
+          key={`${type}-${idx}`} 
+          id={idx === 0 ? id : undefined} 
+          className="bg-white text-black shadow-2xl relative pdf-page flex flex-col" 
+          style={{ width: '210mm', height: '297mm', padding: isFullPage ? '0' : '20mm', boxSizing: 'border-box' }}
+        >
+          {!isFullPage && <h1 className="text-2xl font-bold text-center mb-6">{title} {currentImages.length > 1 ? `(${idx + 1}/${currentImages.length})` : ''}</h1>}
+          <div className={`flex-1 w-full flex items-center justify-center overflow-hidden ${isFullPage ? '' : 'border border-gray-300 p-2 bg-gray-50'}`}>
+            <img src={imgSrc} alt={`${title} ${idx + 1}`} className="w-full h-full object-contain" />
+          </div>
+        </div>
+      ));
+    };
+
+    const SignaturePage = ({ id, courseName, date, time, attendeeCount, setAttendeeCount, signatureData, handleSigChange }) => {
+      const chunks = [];
+      for (let i = 0; i < signatureData.length; i += 20) chunks.push(signatureData.slice(i, i + 20));
+      return chunks.map((chunk, pageIndex) => (
+        <div key={pageIndex} id={pageIndex === 0 ? id : undefined} className="bg-white text-black shadow-2xl relative pdf-page flex flex-col font-serif" style={{ width: '210mm', height: '297mm', padding: '15mm 20mm', boxSizing: 'border-box' }}>
+          <h1 className="text-[22px] font-bold text-center mb-6">‘{courseName}’ 수강생 서 명 부 {chunks.length > 1 ? `(${pageIndex + 1}/${chunks.length})` : ''}</h1>
+          <div className="text-[15px] mb-4 space-y-2 font-bold">
+            <p>1. 교 육 명 : <span className="text-blue-700">{courseName}</span></p>
+            <p>2. 일   시 : <span className="text-blue-700">{date}</span></p>
+            <p>3. 교육시간 : <span className="text-blue-700">( {time} )</span></p>
+            <p className="flex items-center gap-1">4. 참 석 자 수 : <input type="text" className="pdf-input w-12 text-center text-blue-700" value={attendeeCount} onChange={(e) => setAttendeeCount(e.target.value)} />명</p>
+          </div>
+          <table className="w-full border-collapse border border-black text-[14px] text-center table-fixed">
+            <thead><tr className="bg-gray-100 h-[10mm]"><th className="border border-black p-1 w-[12%]">번호</th><th className="border border-black p-1 w-[35%]">성명</th><th className="border border-black p-1 w-[30%]">서명(인)</th><th className="border border-black p-1 w-[23%]">주차번호</th></tr></thead>
+            <tbody>
+              {chunk.map((row, i) => {
+                const globalIndex = pageIndex * 20 + i;
+                return (
+                  <tr key={globalIndex} className="h-[10.5mm]">
+                    <td className="border border-black p-1">{globalIndex + 1}</td>
+                    <td className="border border-black p-1"><input type="text" className="pdf-input w-full text-center font-bold text-blue-700" value={row.name} onChange={(e) => handleSigChange(globalIndex, 'name', e.target.value)} /></td>
+                    <td className="border border-black p-1"></td>
+                    <td className="border border-black p-1"><input type="text" className="pdf-input w-full text-center text-blue-700" value={row.parking} onChange={(e) => handleSigChange(globalIndex, 'parking', e.target.value)} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ));
+    };
+
+    const PhotoDocumentPage = ({ id, type, courseName, date, time, location, images }) => {
+      const config = DOC_CONFIGS[type];
+      const currentImages = images[type];
+      return (
+        <div id={id} className="bg-white text-black shadow-2xl relative pdf-page" style={{ width: '210mm', height: '297mm', padding: '20mm', boxSizing: 'border-box' }}>
+          <div className="h-full flex flex-col">
+            <div className="text-center mb-6">
+              <h1 className="text-xl font-bold mb-2">용인특례시 미디어센터</h1>
+              <h2 className="text-[28px] font-bold leading-tight break-keep" style={{ wordBreak: 'keep-all' }}>{type === 'lecture' ? courseName : `${courseName} - ${config.name}`}</h2>
+            </div>
+            <table className="w-full border-collapse border-2 border-black mb-4 text-lg">
+              <tbody>
+                <tr><td className="border-2 border-black bg-gray-100 font-bold py-2 px-4 w-[25%] text-center align-middle whitespace-nowrap">일 시</td><td className="border-2 border-black py-2 px-4 w-[75%] align-middle font-medium">{`${date}  ${time}`}</td></tr>
+                <tr><td className="border-2 border-black bg-gray-100 font-bold py-2 px-4 text-center align-middle whitespace-nowrap">장 소</td><td className="border-2 border-black py-2 px-4 align-middle font-medium">{location}</td></tr>
+              </tbody>
+            </table>
+            <div className="flex-1 w-full border-2 border-gray-200 p-2 overflow-hidden flex flex-col min-h-0">
+              {currentImages.length === 0 ? (
+                <div className="h-full w-full flex flex-col items-center justify-center text-gray-300"><Icons.Image className="w-16 h-16 mb-2" /><p>사진이 이곳에 표시됩니다 ({config.max}장)</p></div>
+              ) : (
+                <div className={`h-full w-full min-h-0 gap-2 ${type === 'snack' ? 'grid grid-rows-2' : 'grid grid-cols-2 grid-rows-2'}`}>
+                  {currentImages.map((src, idx) => (<div key={idx} className="w-full h-full bg-white border border-gray-100 flex items-center justify-center overflow-hidden min-h-0 p-1"><img src={src} className="max-w-full max-h-full object-contain" /></div>))}
+                  {Array.from({ length: config.max - currentImages.length }).map((_, idx) => (<div key={`empty-${idx}`} className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-100 text-gray-300 min-h-0"><span className="text-sm">사진 없음</span></div>))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    function App() {
+      // 상태 관리
+      const [activeTab, setActiveTab] = useState('before'); // 'before' | 'after'
+      const [courseName, setCourseName] = useState('유튜브 크리에이터 실무-중급과정');
+      const [date, setDate] = useState('2026. 04. 25');
+      const [time, setTime] = useState('14:00~17:00');
+      const [location, setLocation] = useState('용인특례시 미디어센터 3층 플레이그라운드 B');
+      const [toastMsg, setToastMsg] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
+      const [isExcelDragOver, setIsExcelDragOver] = useState(false);
+      const [uploadFormats, setUploadFormats] = useState({});
+
+      const [consentData, setConsentData] = useState({
+        totalHours: '3', bankName: 'SC제일은행', accountNum: '632-20-150364', accountOwner: '박 세 인',
+        totalAmount: '310,000', netAmount: '282,720', signYear: '2026', signMonth: '5', signDay: '8',
+        ssn: '', address: '수원시 권선구 권선로 694번길 25', contact: '010-3477-2932', affiliation: '아이디어플 대표', name: '박 세 인'
+      });
+
+      const [attendeeCount, setAttendeeCount] = useState('');
+      const [signatureData, setSignatureData] = useState(Array(20).fill(null).map(() => ({ name: '', parking: '' })));
+      const [documentOrder, setDocumentOrder] = useState(Object.keys(DOC_CONFIGS));
+      
+      // 처음 시작 시 'before' 탭 문서만 체크된 상태로 초기화
+      const [printSelection, setPrintSelection] = useState(
+        Object.keys(DOC_CONFIGS).reduce((acc, key) => ({...acc, [key]: DOC_CONFIGS[key].tab === 'before'}), {})
+      );
+      const [images, setImages] = useState(
+        Object.keys(DOC_CONFIGS).reduce((acc, key) => DOC_CONFIGS[key].max ? {...acc, [key]: []} : acc, {})
+      );
+
+      const [draggedItemKey, setDraggedItemKey] = useState(null);
+
+      // 스크롤 및 파일 참조
+      const formRefs = useRef({});
+      const fileInputRefs = Object.keys(DOC_CONFIGS).reduce((acc, key) => ({...acc, [key]: useRef(null)}), { excel: useRef(null) });
+      const workspaceFileInputRef = useRef(null);
+
+      // ✅ 2. 탭 이동 로직 (해당 탭 전체 활성화 & 다른 탭 비활성화)
+      const handleTabClick = (tabId) => {
+        setActiveTab(tabId);
+        setPrintSelection(
+          Object.keys(DOC_CONFIGS).reduce((acc, key) => {
+            acc[key] = (DOC_CONFIGS[key].tab === tabId); // 선택한 탭 문서만 true
+            return acc;
+          }, {})
+        );
+      };
+
+      // 유틸 함수
+      const showMessage = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 4000); };
+      
+      // ✅ 4. 스크롤 이동 연동 (좌측 폼 + 우측 미리보기 동시 이동)
+      const scrollToForm = (targetKey) => {
+        // 1. 좌측 입력 폼 위치로 스크롤
+        let formKey = ['consent'].includes(targetKey) ? 'basicInfo' : targetKey;
+        if (formRefs.current[formKey]) {
+          formRefs.current[formKey].scrollIntoView({ behavior: 'smooth', block: 'start' });
+          formRefs.current[formKey].classList.add('ring-2', 'ring-blue-500', 'shadow-lg');
+          setTimeout(() => formRefs.current[formKey].classList.remove('ring-2', 'ring-blue-500', 'shadow-lg'), 1200);
+        }
+        
+        // 2. 우측 미리보기 화면 위치로 스크롤 연동
+        const previewEl = document.getElementById(`preview-${targetKey}`);
+        if (previewEl) {
+          // 화면의 스크롤 컨테이너인 preview-area를 찾아서 스크롤
+          previewEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+
+      // ✅ 1. 저장하기 및 불러오기 기능 복구
+      const handleSaveWorkspace = () => {
+        const workspaceData = { courseName, date, time, location, consentData, attendeeCount, signatureData, documentOrder, printSelection, images };
+        const blob = new Blob([JSON.stringify(workspaceData)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${courseName}_작업내역.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showMessage('작업 내역이 파일로 안전하게 저장되었습니다.');
+      };
+
+      const handleLoadWorkspace = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (data.courseName !== undefined) setCourseName(data.courseName);
+            if (data.date !== undefined) setDate(data.date);
+            if (data.time !== undefined) setTime(data.time);
+            if (data.location !== undefined) setLocation(data.location);
+            if (data.consentData !== undefined) setConsentData(prev => ({ ...prev, ...data.consentData }));
+            if (data.attendeeCount !== undefined) setAttendeeCount(data.attendeeCount);
+            if (data.signatureData !== undefined) setSignatureData(data.signatureData);
+            if (data.documentOrder !== undefined) setDocumentOrder(data.documentOrder);
+            if (data.printSelection !== undefined) setPrintSelection(prev => ({ ...prev, ...data.printSelection }));
+            if (data.images !== undefined) setImages(prev => ({ ...prev, ...data.images }));
+            showMessage('작업 내역을 성공적으로 불러왔습니다.');
+          } catch (err) {
+            showMessage('파일을 읽는 중 오류가 발생했습니다. 올바른 작업 파일인지 확인해주세요.');
+          }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+      };
+
+      // 드래그 앤 드롭 정렬 (목차)
+      const handleDropOrder = (droppedKey) => {
+        if (!draggedItemKey || draggedItemKey === droppedKey) return;
+        const newOrder = [...documentOrder];
+        const draggedIdx = newOrder.indexOf(draggedItemKey);
+        const droppedIdx = newOrder.indexOf(droppedKey);
+        newOrder.splice(draggedIdx, 1);
+        newOrder.splice(droppedIdx, 0, draggedItemKey);
+        setDocumentOrder(newOrder);
+        setDraggedItemKey(null);
+      };
+
+      useEffect(() => {
+        const timeMatch = time.match(/(\d{1,2}):(\d{2})\s*[~-]\s*(\d{1,2}):(\d{2})/);
+        if (timeMatch) {
+          const diff = (parseInt(timeMatch[3]) + parseInt(timeMatch[4]) / 60) - (parseInt(timeMatch[1]) + parseInt(timeMatch[2]) / 60);
+          setConsentData(prev => ({ ...prev, totalHours: Number.isInteger(diff) ? diff.toString() : diff.toFixed(1) }));
+        }
+        const dateMatch = date.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
+        if (dateMatch) setConsentData(prev => ({ ...prev, signYear: dateMatch[1], signMonth: dateMatch[2].replace(/^0+/, ''), signDay: dateMatch[3].replace(/^0+/, '') }));
+      }, [time, date]);
+
+      const handleClearSectionImages = (type) => {
+        setImages(prev => ({ ...prev, [type]: [] }));
+        setUploadFormats(prev => ({ ...prev, [type]: null }));
+        if (fileInputRefs[type].current) fileInputRefs[type].current.value = '';
+      };
+      
+      const removeImage = (type, index) => setImages(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
+
+      const handleFileUpload = async (type, maxCount, files) => {
+  if (!files.length) return;
+  if (files.some(f => f.name.endsWith('.ppt') || f.name.endsWith('.pptx'))) showMessage('🚨 PPT 파일은 PDF로 저장 후 올려주세요!');
+  
+  const pdfFiles = files.filter(f => f.type === 'application/pdf');
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+  // ✅ 업로드 형식(pdf인지 image인지) 저장
+  if (pdfFiles.length > 0) setUploadFormats(prev => ({ ...prev, [type]: 'pdf' }));
+  else if (imageFiles.length > 0) setUploadFormats(prev => ({ ...prev, [type]: 'image' }));
+
+  if (pdfFiles.length > 0) {
+    setIsLoading(true); showMessage('PDF에서 페이지를 추출하고 있습니다...');
+    for (let file of pdfFiles) {
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+        
+        // ✨ 기존의 난수(랜덤) 추출 로직 그대로 유지!
+        const pageIndices = maxCount === 1 ? [1] : Array.from({length: Math.min(pdf.numPages, maxCount - images[type].length)}, () => Math.floor(Math.random() * pdf.numPages) + 1).sort((a,b)=>a-b);
+        
+        for (let pageNum of [...new Set(pageIndices)]) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width; canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          setImages(prev => prev[type].length < maxCount ? { ...prev, [type]: [...prev[type], canvas.toDataURL('image/jpeg', 0.9)] } : prev);
+        }
+      } catch (err) { console.error(err); showMessage('PDF 처리 중 오류 발생'); }
+    }
+    setIsLoading(false);
+  }
+
+  if (imageFiles.length > 0) {
+    setImages(prev => { if(imageFiles.length > maxCount - prev[type].length) setTimeout(() => showMessage(`최대 ${maxCount}장까지만 가능합니다.`), 100); return prev; });
+    imageFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => setImages(prev => prev[type].length < maxCount ? { ...prev, [type]: [...prev[type], e.target.result] } : prev);
+      reader.readAsDataURL(file);
+    });
+  }
+};
+
+      const handleExcelFile = (file) => {
+        if (!file) return;
+        const isCSV = file.name.toLowerCase().endsWith('.csv');
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            let json = [];
+            if (isCSV) {
+              const parseCSV = (str) => { 
+                const rows = []; let row=[], cell='', inQ=false;
+                for(let i=0; i<str.length; i++){
+                  const c = str[i];
+                  if(inQ){ if(c==='"' && str[i+1]==='"'){cell+='"'; i++;} else if(c==='"')inQ=false; else cell+=c; }
+                  else { if(c==='"')inQ=true; else if(c===','){row.push(cell.trim());cell='';} else if(c==='\n'||c==='\r'){ if(c==='\r'&&str[i+1]==='\n')i++; row.push(cell.trim());rows.push(row);row=[];cell='';} else cell+=c; }
+                }
+                if(cell||row.length) { row.push(cell.trim()); rows.push(row); }
+                return rows.filter(r => r.some(c => c !== ''));
+              };
+              json = parseCSV(evt.target.result);
+            } else {
+              const view = new Uint8Array(evt.target.result);
+              if ((view[0] === 0x50 && view[1] === 0x4B) || (view[0] === 0xD0 && view[1] === 0xCF)) {
+                const wb = XLSX.read(evt.target.result, { type: 'array', codepage: 949 });
+                json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+              }
+            }
+
+            if (!json.length) return showMessage('데이터가 없습니다.');
+            const extractedNames = [];
+            for (let i = 1; i < json.length; i++) {
+              if (!Array.isArray(json[i])) continue;
+              const name = json[i][3], status = json[i][14];
+              if (status && String(status).includes('취소')) continue;
+              if (name) {
+                const clean = String(name).replace(/^"|"$/g, '').trim();
+                if (clean && clean !== '신청자' && clean !== '성명') extractedNames.push(clean);
+              }
+            }
+
+            if (extractedNames.length > 0) {
+              setSignatureData(Array(Math.max(20, Math.ceil(extractedNames.length / 20) * 20)).fill(null).map((_, i) => ({ name: extractedNames[i] || '', parking: '' })));
+              setAttendeeCount(String(extractedNames.length));
+              showMessage(`총 ${extractedNames.length}명의 명단이 입력되었습니다.`);
+            } else showMessage('유효한 이름 데이터를 찾을 수 없습니다.');
+          } catch (e) { showMessage('오류가 발생했습니다.'); }
+        };
+        isCSV ? reader.readAsText(file, 'utf-8') : reader.readAsArrayBuffer(file);
+      };
+
+      const handlePrint = () => window.print();
+
+      // 현재 활성화된 탭의 문서 키 목록
+      const currentTabKeys = documentOrder.filter(key => DOC_CONFIGS[key].tab === activeTab);
+      // 체크된 문서 중에서 폼 렌더링이 필요한지 확인
+      const needsBasicInfo = currentTabKeys.some(key => printSelection[key] && DOC_CONFIGS[key].needsBasicInfo);
+      const needsExcelForm = currentTabKeys.some(key => printSelection[key] && DOC_CONFIGS[key].needsExcel);
+      const activeUploadKeys = currentTabKeys.filter(key => printSelection[key] && DOC_CONFIGS[key].max);
+
+      const handleConsentChange = (f, v) => {
+  setConsentData((prev) => {
+    const updated = { ...prev, [f]: v };
+
+    // 세전 총액(totalAmount)이 변경된 경우 실수령액 계산
+    if (f === 'totalAmount') {
+      const rawValue = v.replace(/,/g, ''); // 콤마 제거
+      const gross = Number(rawValue) || 0;
+      const net = Math.ceil(gross * 0.912); // 8.8% 차감 후 소수점 버림
+      
+      updated.netAmount = net.toLocaleString(); // 콤마 포맷팅 후 저장
+    }
+
+    return updated;
+  });
+};
+
+      return (
+        <div className="min-h-screen bg-gray-100 flex relative">
+          {toastMsg && <div className="fixed top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl z-50 text-sm font-bold transition-opacity">{toastMsg}</div>}
+          {isLoading && <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center"><div className="bg-white p-4 rounded-lg shadow font-bold text-blue-600">처리 중입니다...</div></div>}
+
+          {/* 좌측 패널 */}
+          <div id="sidebar" className="w-[450px] min-w-[450px] bg-white border-r border-gray-200 flex flex-col shadow-lg z-10 h-screen sticky top-0">
+            <div className="p-6 pb-2 border-b border-gray-100 shrink-0">
+              <h1 className="text-2xl font-bold text-gray-800 mb-1">통합 증빙 서류 생성기</h1>
+              <p className="text-sm text-gray-500 mb-4">필요한 문서만 선택하여 인쇄 및 작업이 가능합니다.</p>
+              
+              {/* ✅ 1. 저장하기 및 불러오기 (JSON) 복구 영역 */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={handleSaveWorkspace} className="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 py-2 rounded text-xs font-bold flex items-center justify-center gap-1 hover:bg-indigo-100 transition-colors">
+                  <Icons.Save className="w-4 h-4" /> 내역 저장하기 (PC)
+                </button>
+                <button onClick={() => workspaceFileInputRef.current?.click()} className="flex-1 bg-amber-50 text-amber-700 border border-amber-200 py-2 rounded text-xs font-bold flex items-center justify-center gap-1 hover:bg-amber-100 transition-colors">
+                  <Icons.FolderOpen className="w-4 h-4" /> 내역 불러오기
+                </button>
+                <input type="file" accept=".json" className="hidden" ref={workspaceFileInputRef} onChange={handleLoadWorkspace} />
+              </div>
+
+              {/* ✅ 2. 탭 버튼 영역 */}
+              <div className="flex border-b border-gray-200">
+                <button onClick={() => handleTabClick('before')} className={`flex-1 py-3 text-sm font-bold transition-colors ${activeTab === 'before' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-500 hover:bg-gray-50'}`}>[수업 전] 필수 서류</button>
+                <button onClick={() => handleTabClick('after')} className={`flex-1 py-3 text-sm font-bold transition-colors ${activeTab === 'after' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-gray-500 hover:bg-gray-50'}`}>[수업 후] 증빙 서류</button>
+              </div>
+            </div>
+
+            {/* 좌측 메인 스크롤 영역 */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 pb-24">
+              
+              <div className="bg-gray-800 text-white p-4 rounded-lg shadow-inner shrink-0">
+                <h3 className="font-bold text-sm mb-2 text-gray-100 flex items-center gap-2"><Icons.Printer className="w-4 h-4" /> 출력 문서 선택</h3>
+                <p className="text-[11px] text-gray-400 mb-3">체크하면 하단에 입력 폼이 열립니다. 끌어서 순서를 변경하세요.</p>
+                <div className="flex flex-col gap-2 text-sm font-medium">
+                  {currentTabKeys.map((key) => (
+                    <div 
+                      key={key} draggable onDragStart={() => setDraggedItemKey(key)} onDragOver={(e) => e.preventDefault()} onDrop={() => handleDropOrder(key)}
+                      className={`flex items-center justify-between bg-gray-700 p-2 rounded cursor-move transition-colors border ${draggedItemKey === key ? 'opacity-50' : 'border-transparent hover:border-gray-500'}`}
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-blue-300 flex-1">
+                        <input type="checkbox" checked={printSelection[key]} onChange={(e) => setPrintSelection({...printSelection, [key]: e.target.checked})} className="w-4 h-4 text-blue-500 rounded" />
+                        <span onClick={(e) => { e.preventDefault(); if(!printSelection[key]) setPrintSelection({...printSelection, [key]: true}); setTimeout(() => scrollToForm(key), 50); }} className="flex items-center gap-1">
+                          {DOC_CONFIGS[key].name} <Icons.Link className="w-3 h-3 text-gray-400 opacity-50" />
+                        </span>
+                      </label>
+                      <Icons.Grip className="w-4 h-4 text-gray-500 ml-2 pointer-events-none" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {(needsBasicInfo || needsExcelForm || activeUploadKeys.length > 0) && (
+                <div className="border-t-2 border-dashed border-gray-200 my-2 relative">
+                  <span className="absolute left-1/2 transform -translate-x-1/2 -top-3 bg-white px-3 text-xs font-bold text-gray-400">필요한 정보 입력란</span>
+                </div>
+              )}
+
+              {/* 기본 정보 폼 */}
+              {needsBasicInfo && (
+                <div ref={el => formRefs.current['basicInfo'] = el} className="bg-blue-50 p-4 rounded-lg border border-blue-100 transition-all duration-300">
+                  <h3 className="font-bold text-blue-800 text-sm mb-2">기본 정보</h3>
+                  <div className="space-y-3">
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">강의명</label><input type="text" value={courseName} onChange={(e) => setCourseName(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-sm" /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">일자</label><input type="text" value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-sm" /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">시간</label><input type="text" value={time} onChange={(e) => setTime(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-sm" /></div>
+                    </div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">장소</label><input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-sm" /></div>
+                  </div>
+                </div>
+              )}
+
+              {/* 엑셀 폼 */}
+              {needsExcelForm && (
+                <div 
+                  ref={el => formRefs.current['signature'] = el}
+                  className={`bg-green-50 p-4 rounded-lg border-2 border-dashed transition-all duration-300 ${isExcelDragOver ? 'border-green-500 bg-green-100' : 'border-green-200'}`}
+                  onDragOver={(e) => { e.preventDefault(); setIsExcelDragOver(true); }} onDragLeave={() => setIsExcelDragOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsExcelDragOver(false); if(e.dataTransfer.files[0]) handleExcelFile(e.dataTransfer.files[0]); }}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-bold text-green-800 flex items-center gap-1"><Icons.Excel className="w-4 h-4" /> 서명부 명단 엑셀 연동</label>
+                    {attendeeCount && <span className="text-xs font-bold text-green-600">{attendeeCount}명 추출됨</span>}
+                  </div>
+                  <button onClick={() => fileInputRefs.excel.current?.click()} className="w-full bg-white border border-green-300 text-green-700 hover:bg-green-100 font-bold py-2 rounded text-sm cursor-pointer">{isExcelDragOver ? '여기에 파일을 놓으세요!' : '명단 엑셀(XLSX)/CSV 끌어다 놓기'}</button>
+                  <input type="file" accept=".xlsx, .xls, .csv" className="hidden" ref={fileInputRefs.excel} onChange={(e) => handleExcelFile(e.target.files[0])} />
+                </div>
+              )}
+
+              {/* 이미지/PDF 업로드 섹션 매핑 */}
+              {activeUploadKeys.map(key => (
+                <div key={key} ref={el => formRefs.current[key] = el}>
+                  <UploadSection type={key} config={DOC_CONFIGS[key]} images={images} handleFileUpload={handleFileUpload} handleClearSectionImages={handleClearSectionImages} fileInputRef={fileInputRefs[key]} removeImage={removeImage} uploadFormat={uploadFormats[key]}/>
+                </div>
+              ))}
+            </div>
+
+            {/* 하단 고정 인쇄 버튼 영역 */}
+            <div className="absolute bottom-0 left-0 w-full p-4 bg-white border-t border-gray-200 shrink-0">
+              <button onClick={handlePrint} className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-md">
+                <Icons.Printer className="w-5 h-5" /> 인쇄 및 PDF 다운로드
+              </button>
+            </div>
+          </div>
+
+          {/* 우측 패널: 문서 프리뷰 (현재 활성화된 탭의 체크된 문서만 렌더링) */}
+          <div id="preview-area" className="flex-1 p-8 overflow-y-auto flex flex-col items-center bg-gray-200">
+            <div id="pdf-content-wrapper" className="flex flex-col gap-8 w-fit">
+              {documentOrder.map(key => {
+                // 현재 선택된 탭이 아니거나 체크박스가 해제된 경우 화면에 표시하지 않음
+                if (DOC_CONFIGS[key].tab !== activeTab || !printSelection[key]) return null;
+                
+                const previewId = `preview-${key}`; // 각 문서 영역의 고유 ID 부여
+                
+                if (key === 'consent') return <ConsentPage key={key} id={previewId} courseName={courseName} date={date} time={time} consentData={consentData} handleChange={handleConsentChange} />;
+                if (key === 'signature') return <SignaturePage key={key} id={previewId} courseName={courseName} date={date} time={time} attendeeCount={attendeeCount} setAttendeeCount={setAttendeeCount} signatureData={signatureData} handleSigChange={(idx, f, v) => { const nd=[...signatureData]; nd[idx]={...nd[idx],[f]:v}; setSignatureData(nd); }} />;
+                if (['consentScan', 'resume', 'idCard', 'bankbook', 'signatureScan'].includes(key)) return <SingleImagePage key={key} id={previewId} type={key} title={DOC_CONFIGS[key].name} images={images} isFullPageOverride={true} />;
+                if (['snack', 'lecture', 'material'].includes(key)) {
+  // ✅ 오직 '강의 사진(lecture)'이고 PDF로 업로드 된 경우에만 전체화면 스캔본 스타일 적용!
+  if (key === 'lecture' && uploadFormats[key] === 'pdf') {
+    return <SingleImagePage key={key} id={previewId} type={key} title={DOC_CONFIGS[key].name} images={images} isFullPageOverride={true} />;
+  }
+  
+  // ✅ 다과(snack)나 강의자료(material)는 PDF로 올려도 추출된 이미지가 무조건 기존 4분할/2분할 폼에 들어감!
+  return <PhotoDocumentPage key={key} id={previewId} type={key} courseName={courseName} date={date} time={time} location={location} images={images} />;
+}
+                return null;
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
