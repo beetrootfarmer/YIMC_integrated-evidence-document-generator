@@ -57,6 +57,8 @@ interface PreviewAreaProps {
   handleConsentChange: (field: ConsentField, value: string) => void;
   attendeeCount: string;
   setAttendeeCount: (v: string) => void;
+  extraColumnLabel: string;
+  setExtraColumnLabel: (v: string) => void;
   signatureData: SignatureRow[];
   handleSigChange: (index: number, field: keyof SignatureRow, value: string) => void;
   images: ImagesState;
@@ -75,6 +77,8 @@ export const PreviewArea = ({
   handleConsentChange,
   attendeeCount,
   setAttendeeCount,
+  extraColumnLabel,
+  setExtraColumnLabel,
   signatureData,
   handleSigChange,
   images,
@@ -110,6 +114,8 @@ export const PreviewArea = ({
               time={time}
               attendeeCount={attendeeCount}
               setAttendeeCount={setAttendeeCount}
+              extraColumnLabel={extraColumnLabel}
+              setExtraColumnLabel={setExtraColumnLabel}
               signatureData={signatureData}
               handleSigChange={handleSigChange}
             />

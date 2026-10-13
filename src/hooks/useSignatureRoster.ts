@@ -48,6 +48,7 @@ const parseCSV = (str: string): string[][] => {
 
 export const useSignatureRoster = (showMessage: (msg: string) => void) => {
   const [attendeeCount, setAttendeeCount] = useState('');
+  const [extraColumnLabel, setExtraColumnLabel] = useState('주차번호');
   const [signatureData, setSignatureData] = useState<SignatureRow[]>(createEmptyRows(20));
 
   const handleSigChange = (index: number, field: keyof SignatureRow, value: string) => {
@@ -115,5 +116,14 @@ export const useSignatureRoster = (showMessage: (msg: string) => void) => {
     else reader.readAsArrayBuffer(file);
   };
 
-  return { attendeeCount, setAttendeeCount, signatureData, setSignatureData, handleSigChange, handleExcelFile };
+  return {
+    attendeeCount,
+    setAttendeeCount,
+    extraColumnLabel,
+    setExtraColumnLabel,
+    signatureData, 
+    setSignatureData,
+    handleSigChange,
+    handleExcelFile,
+  };
 };

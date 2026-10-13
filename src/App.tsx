@@ -64,8 +64,16 @@ function App() {
   const [location, setLocation] = useState('용인특례시 미디어센터 3층 플레이그라운드 B');
 
   const { consentData, setConsentData, handleConsentChange } = useConsentData(date, time);
-  const { attendeeCount, setAttendeeCount, signatureData, setSignatureData, handleSigChange, handleExcelFile } =
-    useSignatureRoster(showMessage);
+  const {
+    attendeeCount,
+    setAttendeeCount,
+    extraColumnLabel,
+    setExtraColumnLabel,
+    signatureData,
+    setSignatureData,
+    handleSigChange,
+    handleExcelFile,
+  } = useSignatureRoster(showMessage);
   const { images, setImages, uploadFormats, isLoading, handleFileUpload, handleClearSectionImages, removeImage } =
     useImageUpload(showMessage);
   const {
@@ -87,6 +95,7 @@ function App() {
     location,
     consentData,
     attendeeCount,
+    extraColumnLabel,
     signatureData,
     documentOrder,
     printSelection,
@@ -102,6 +111,7 @@ function App() {
       setLocation,
       setConsentData,
       setAttendeeCount,
+      setExtraColumnLabel,
       setSignatureData,
       setDocumentOrder,
       setPrintSelection,
@@ -164,6 +174,8 @@ function App() {
           handleConsentChange={handleConsentChange}
           attendeeCount={attendeeCount}
           setAttendeeCount={setAttendeeCount}
+          extraColumnLabel={extraColumnLabel}
+          setExtraColumnLabel={setExtraColumnLabel}
           signatureData={signatureData}
           handleSigChange={handleSigChange}
           images={images}

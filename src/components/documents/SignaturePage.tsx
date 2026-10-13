@@ -40,6 +40,8 @@ interface SignaturePageProps {
   time: string;
   attendeeCount: string;
   setAttendeeCount: (value: string) => void;
+  extraColumnLabel: string;
+  setExtraColumnLabel: (value: string) => void;
   signatureData: SignatureRow[];
   handleSigChange: (index: number, field: keyof SignatureRow, value: string) => void;
 }
@@ -51,6 +53,8 @@ export const SignaturePage = ({
   time,
   attendeeCount,
   setAttendeeCount,
+  extraColumnLabel,
+  setExtraColumnLabel,
   signatureData,
   handleSigChange,
 }: SignaturePageProps) => {
@@ -94,7 +98,14 @@ export const SignaturePage = ({
                 <PdfTh style={{ width: '12%' }}>번호</PdfTh>
                 <PdfTh style={{ width: '35%' }}>성명</PdfTh>
                 <PdfTh style={{ width: '30%' }}>서명(인)</PdfTh>
-                <PdfTh style={{ width: '23%' }}>주차번호</PdfTh>
+                <PdfTh style={{ width: '23%' }}>
+                  <PdfInput
+                    type="text"
+                    style={{ width: '100%', textAlign: 'center', fontWeight: 'bold', color: '#1d4ed8' }}
+                    value={extraColumnLabel}
+                    onChange={(e) => setExtraColumnLabel(e.target.value)}
+                  />
+                </PdfTh>
               </tr>
             </thead>
             <tbody>

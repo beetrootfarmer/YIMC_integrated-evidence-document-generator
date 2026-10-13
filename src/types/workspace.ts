@@ -14,6 +14,7 @@ export interface WorkspaceData {
   location: string;
   consentData: ConsentData;
   attendeeCount: string;
+  extraColumnLabel?: string;
   signatureData: SignatureRow[];
   documentOrder: DocKey[];
   printSelection: PrintSelection;

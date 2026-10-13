@@ -8,6 +8,7 @@ interface WorkspaceSetters {
   setLocation: (v: string) => void;
   setConsentData: (updater: (prev: ConsentData) => ConsentData) => void;
   setAttendeeCount: (v: string) => void;
+  setExtraColumnLabel: (v: string) => void;
   setSignatureData: (v: SignatureRow[]) => void;
   setDocumentOrder: (v: DocKey[]) => void;
   setPrintSelection: (updater: (prev: PrintSelection) => PrintSelection) => void;
@@ -48,6 +49,7 @@ export const useWorkspacePersistence = (
           setters.setConsentData((prev) => ({ ...prev, ...data.consentData }));
         }
         if (data.attendeeCount !== undefined) setters.setAttendeeCount(data.attendeeCount);
+        if (data.extraColumnLabel !== undefined) setters.setExtraColumnLabel(data.extraColumnLabel);
         if (data.signatureData !== undefined) setters.setSignatureData(data.signatureData);
         if (data.documentOrder !== undefined) setters.setDocumentOrder(data.documentOrder);
         if (data.printSelection !== undefined) {
