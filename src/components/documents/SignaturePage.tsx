@@ -6,7 +6,7 @@ const Title = styled.h1`
   font-size: 22px;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 `;
 
 const InfoBlock = styled.div`
@@ -26,7 +26,7 @@ const InfoRow = styled.p`
 `;
 
 const PhotoNotice = styled.p`
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.25rem;
   font-size: 9pt;
   line-height: 1.2;
   text-align: right;
@@ -64,7 +64,7 @@ export const SignaturePage = ({
   return (
     <>
       {chunks.map((chunk, pageIndex) => (
-        <PdfPage key={pageIndex} id={pageIndex === 0 ? id : undefined} $padding="15mm 20mm" $font="serif">
+        <PdfPage key={pageIndex} id={pageIndex === 0 ? id : undefined} $padding="12mm 20mm" $font="serif">
           <Title>
             '{courseName}' 수강생 서 명 부 {chunks.length > 1 ? `(${pageIndex + 1}/${chunks.length})` : ''}
           </Title>
