@@ -11,7 +11,7 @@ const Title = styled.h1`
 
 const InfoBlock = styled.div`
   font-size: 15px;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -23,6 +23,14 @@ const InfoRow = styled.p`
   display: flex;
   align-items: center;
   gap: 0.25rem;
+`;
+
+const PhotoNotice = styled.p`
+  margin: 0 0 0.5rem;
+  font-size: 9pt;
+  line-height: 1.2;
+  text-align: right;
+  color: #1d4ed8;
 `;
 
 interface SignaturePageProps {
@@ -77,6 +85,8 @@ export const SignaturePage = ({
               명
             </InfoRow>
           </InfoBlock>
+
+          <PhotoNotice>수업 중 증빙용 사진 촬영이 있습니다.</PhotoNotice>
 
           <PdfTable style={{ fontSize: '14px', tableLayout: 'fixed' }}>
             <thead>
