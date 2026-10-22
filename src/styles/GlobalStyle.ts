@@ -29,6 +29,12 @@ export const GlobalStyle = createGlobalStyle`
     background: #a8a8a8;
   }
 
+  /* Pages are laid out as exact A4 boxes, so the printer must not add its own margins. */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
   @media print {
     body {
       background-color: white !important;

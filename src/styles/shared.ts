@@ -24,6 +24,12 @@ export const PdfPage = styled.div<{
     margin: 0 !important;
     page-break-after: always !important;
     break-after: page !important;
+
+    /* A forced break after the final page makes browsers emit a trailing blank page. */
+    &:last-child {
+      page-break-after: auto !important;
+      break-after: auto !important;
+    }
   }
 `;
 
