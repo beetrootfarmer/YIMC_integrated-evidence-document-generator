@@ -41,6 +41,11 @@ export const GlobalStyle = createGlobalStyle`
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
+
+    /* Hide anything injected outside the app (e.g. the "Powered by Netlify" badge). */
+    body > *:not(#root) {
+      display: none !important;
+    }
   }
 
   /* Temporary highlight applied to a form section when jumped to via the
